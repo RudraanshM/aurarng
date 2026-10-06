@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura RNG Simulator: Auto-Save Edition</title>
+    <style>
+        :root {
+            --bg: #030406;
+            --card-bg: rgba(15, 23, 42, 0.85);
+            --border: #1e293b;
+            --accent: #8b5cf6;
+            --text: #f8fafc;
+            --subtext: #94a3b8;
+            --aura-color: #94a3b8;
+            --aura-glow: rgba(148, 163, 184, 0.3);
+            --theme-accent: #8b5cf6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.5rem;
+            overflow-x: hidden;
+            transition: background 0.8s ease;
+        }
+
+        body.theme-godly { background: radial-gradient(circle at center, #2e1065 0%, #030008 100%); }
+        body.theme-celestial { background: radial-gradient(circle at center, #1a052b 0%, #030008 100%); }
+        body.theme-divine { background: radial-gradient(circle at center, #022c22 0%, #020617 100%); }
+        body.theme-mythic { background: radial-gradient(circle at center, #2e020d 0%, #050002 100%); }
+
+        .hud {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            max-width: 650px;
+            justify-content: space-between;
+            z-index: 10;
+        }
+
+        .stat-box {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+            border-radius: 12px;
+            text-align: center;
+            flex: 1;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--subtext);
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .stat-val {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .display-stage {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            max-width: 500px;
+            z-index: 10;
+            perspective: 1000px;
+        }
+
+        .aura-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 2px solid var(--aura-color);
+            border-radius: 24px;
+            padding: 2rem 1.75rem;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 0 50px var(--aura-glow);
+            transition: border-color 0.4s ease, box-shadow 0.4s ease, transform 0.1s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .aura-title {
+            font-size: 2rem;
+            font-weight: 900;
+            margin-bottom: 0.2rem;
+            color: var(--aura-color);
+            text-shadow: 0 0 20px var(--aura-glow);
+            letter-spacing: 1px;
+        }
+
+        .aura-chance {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--aura-color);
+            opacity: 0.9;
+        }
+
+        .aura-tier {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            background: rgba(255,255,255,0.05);
+            color: var(--aura-color);
+            border: 1px solid var(--aura-color);
+        }
+
+        .power-box {
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 10px;
+            background: rgba(0,0,0,0.5);
+            border: 1px dashed var(--aura-color);
+            color: #cbd5e1;
+            font-size: 0.85rem;
+            font-weight: 600;
+            min-height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .screen-shake { animation: shake 0.05s infinite alternate; }
+        @keyframes shake {
+            0% { transform: translate(3px, 3px); }
+            100% { transform: translate(-3px, -3px); }
+        }
+
+        .screen-shake-extreme { animation: extremeShake 0.03s infinite alternate; }
+        @keyframes extremeShake {
+            0% { transform: translate(8px, -8px) rotate(-1deg); }
+            100% { transform: translate(-8px, 8px) rotate(1deg); }
+        }
+
+        .cutscene-flash { animation: flash 0.6s ease-out; }
+        @keyframes flash {
+            0% { background-color: #fff; }
+            100% { background-color: transparent; }
+        }
+
+        .controls {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 10;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #fff;
+            background: linear-gradient(135deg, #6366f1, var(--theme-accent));
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        button:hover { transform: translateY(-2deg); filter: brightness(1.1); }
+        button:active { transform: translateY(1deg); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        button.active {
+            background: linear-gradient(135deg, #ef4444, #f97316);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        }
+
+        .secondary-btn {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid var(--border);
+            box-shadow: none;
+        }
+
+        .danger-btn {
+            background: linear-gradient(135deg, #ef4444, #991b1b);
+        }
+
+        .upgrade-btn { background: linear-gradient(135deg, #10b981, #059669); }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(8px);
+        }
+
+        .modal-content {
+            background: #0f172a;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.75rem;
+        }
+
+        .close-btn {
+            background: none; border: none; color: var(--subtext);
+            font-size: 1.5rem; cursor: pointer; padding: 0; width: auto;
+        }
+
+        .inventory-list {
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .inv-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 10px;
+            border-left: 5px solid;
+        }
+
+        .inv-btn {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            width: auto;
+            border-radius: 8px;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            pointer-events: none;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="canvas"></canvas>
+
+    <div class="hud">
+        <div class="stat-box">
+            <div class="stat-label">Total Rolls</div>
+            <div id="roll-count" class="stat-val">0</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Luck Multiplier</div>
+            <div id="luck-val" class="stat-val">1.0x</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Coins</div>
+            <div id="coin-val" class="stat-val">0</div>
+        </div>
+    </div>
+
+    <div class="display-stage">
+        <div id="aura-card" class="aura-card">
+            <div id="aura-title" class="aura-title">None</div>
+            <div id="aura-chance" class="aura-chance">1 in 1</div>
+            <div id="aura-tier" class="aura-tier">Basic</div>
+            <div id="power-box" class="power-box">Equip an Aura to unlock its unique active power!</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="btn-row">
+            <button id="roll-btn" onclick="roll()">ROLL AURA</button>
+            <button id="auto-btn" class="secondary-btn" onclick="toggleAuto()">AUTO: OFF</button>
+        </div>
+        <div class="btn-row">
+            <button class="upgrade-btn" onclick="upgradeLuck()">Up Luck (<span id="luck-cost">50</span> Coins)</button>
+            <button class="secondary-btn" onclick="openCollection()">Collection</button>
+            <button class="danger-btn" onclick="resetSave()" style="flex:0.4;">Reset</button>
+        </div>
+    </div>
+
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Collection (<span id="discovered-count">0</span>)</h2>
+                <button class="close-btn" onclick="closeCollection()">&times;</button>
+            </div>
+            <div id="inventory-list" class="inventory-list"></div>
+        </div>
+    </div>
+
+    <script>
+        const PREFIXES = [
+            "Supernova", "Chronos", "Hyperion", "Voidwalker", "Solstice", 
+            "Eclipse", "Ragnarok", "Genesis", "Aether", "Apostle",
+            "Flaming", "Frozen", "Galactic", "Radiant", "Quantum", 
+            "Celestial", "Abyssal", "Temporal", "Infinite", "Singularity"
+        ];
+        
+        const NOUNS = [
+            "Overlord", "Emperor", "Dominion", "Cataclysm", "Eternity", 
+            "Sovereign", "Vanguard", "Matrix", "Reaver", "Monarch",
+            "Core", "Echo", "Domain", "Nova", "VORTEX", "Aegis"
+        ];
+
+        function getTier(chance) {
+            if (chance >= 100000000) return "GODLY";
+            if (chance >= 20000000) return "CELESTIAL";
+            if (chance >= 3000000) return "DIVINE";
+            if (chance >= 100000) return "MYTHIC";
+            if (chance >= 10000) return "Legendary";
+            if (chance >= 1000) return "Epic";
+            if (chance >= 100) return "Rare";
+            if (chance >= 10) return "Uncommon";
+            return "Common";
+        }
+
+        function getEffectType(tier, index) {
+            if (tier === "GODLY") return "godly";
+            if (tier === "CELESTIAL") return "shockwave";
+            if (tier === "DIVINE") return index % 2 === 0 ? "rays" : "spiral";
+            if (tier === "MYTHIC") return index % 3 === 0 ? "pulse" : (index % 3 === 1 ? "vortex" : "rays");
+            return null;
+        }
+
+        function generate324Auras() {
+            const list = [];
+            let currentChance = 1;
+
+            list.push({ 
+                name: "Common", chance: 1, color: "#94a3b8", bg: "theme-basic", tier: "Common",
+                desc: "No special power.", coinMult: 1, luckBoost: 0, effect: null
+            });
+
+            // CUSTOM AURAS HARDCODED
+            list.push({ 
+                name: "Apostle Matrix", chance: 37591, color: "#f43f5e", bg: "theme-mythic", tier: "MYTHIC", 
+                desc: "Matrix Surge: +1.83x Luck & 4.66x Coins", coinMult: 4.66, luckBoost: 1.83, effect: null 
+            });
+
+            list.push({ 
+                name: "Flaming Domain", chance: 115000, color: "#ff4500", bg: "theme-mythic", tier: "MYTHIC", 
+                desc: "Infernal Surge: +2.03x Luck & 5.05x Coins", coinMult: 5.05, luckBoost: 2.03, effect: "pulse" 
+            });
+
+            let colorHue = 180;
+            let counter = 1;
+
+            for (let p of PREFIXES) {
+                for (let n of NOUNS) {
+                    currentChance = Math.floor(currentChance * 1.055) + 1;
+                    colorHue = (colorHue + 137) % 360;
+
+                    const tier = getTier(currentChance);
+                    
+                    let bgClass = "theme-basic";
+                    if (tier === "GODLY") bgClass = "theme-godly";
+                    else if (tier === "CELESTIAL") bgClass = "theme-celestial";
+                    else if (tier === "DIVINE") bgClass = "theme-divine";
+                    else if (tier === "MYTHIC") bgClass = "theme-mythic";
+
+                    const luckBoost = parseFloat((Math.log10(currentChance) * 0.4).toFixed(2));
+                    const coinMult = parseFloat((1 + Math.log10(currentChance) * 0.8).toFixed(2));
+                    const effect = getEffectType(tier, counter);
+
+                    list.push({
+                        name: `${p} ${n}`,
+                        chance: currentChance,
+                        color: `hsl(${colorHue}, 85%, 65%)`,
+                        bg: bgClass,
+                        tier: tier,
+                        desc: `${p} Surge: +${luckBoost}x Luck & ${coinMult}x Coins`,
+                        coinMult: coinMult,
+                        luckBoost: luckBoost,
+                        effect: effect
+                    });
+
+                    counter++;
+                }
+            }
+            return list.sort((a, b) => b.chance - a.chance);
+        }
+
+        const AURAS = generate324Auras();
+        
+        let rolls = 0;
+        let baseLuck = 1.0;
+        let luckCost = 50;
+        let coins = 0;
+        let isRolling = false;
+        let autoRoll = false;
+        let autoInterval = null;
+        let inventory = {};
+        let equippedAura = null;
+
+        const rollCountEl = document.getElementById('roll-count');
+        const luckValEl = document.getElementById('luck-val');
+        const coinValEl = document.getElementById('coin-val');
+        const luckCostEl = document.getElementById('luck-cost');
+        const auraTitle = document.getElementById('aura-title');
+        const auraChance = document.getElementById('aura-chance');
+        const auraTier = document.getElementById('aura-tier');
+        const auraCard = document.getElementById('aura-card');
+        const powerBox = document.getElementById('power-box');
+        const rollBtn = document.getElementById('roll-btn');
+        const autoBtn = document.getElementById('auto-btn');
+        const modal = document.getElementById('modal');
+        const invList = document.getElementById('inventory-list');
+        const discoveredCountEl = document.getElementById('discovered-count');
+
+        // --- LOCAL STORAGE AUTO-SAVE SYSTEM ---
+        function saveGame() {
+            const data = {
+                rolls: rolls,
+                baseLuck: baseLuck,
+                luckCost: luckCost,
+                coins: coins,
+                inventory: inventory,
+                equippedAuraName: equippedAura ? equippedAura.name : null
+            };
+            localStorage.setItem('AURA_RNG_SAVE_DATA', JSON.stringify(data));
+        }
+
+        function loadGame() {
+            const saved = localStorage.getItem('AURA_RNG_SAVE_DATA');
+            if (!saved) return;
+
+            try {
+                const data = JSON.parse(saved);
+                rolls = data.rolls || 0;
+                baseLuck = data.baseLuck || 1.0;
+                luckCost = data.luckCost || 50;
+                coins = data.coins || 0;
+                inventory = data.inventory || {};
+
+                if (data.equippedAuraName && inventory[data.equippedAuraName]) {
+                    equippedAura = inventory[data.equippedAuraName];
+                    document.body.className = '';
+                    if (equippedAura.bg) document.body.classList.add(equippedAura.bg);
+                    document.documentElement.style.setProperty('--theme-accent', equippedAura.color);
+                    updateCardDisplay(equippedAura);
+                }
+
+                rollCountEl.innerText = formatNum(rolls);
+                coinValEl.innerText = formatNum(coins);
+                luckValEl.innerText = getTotalLuck() + "x";
+                luckCostEl.innerText = formatNum(luckCost);
+            } catch (e) {
+                console.error("Failed to load save data", e);
+            }
+        }
+
+        function resetSave() {
+            if (confirm("Are you sure you want to reset all your progress?")) {
+                localStorage.removeItem('AURA_RNG_SAVE_DATA');
+                location.reload();
+            }
+        }
+
+        function getTotalLuck() {
+            const boost = equippedAura ? equippedAura.luckBoost : 0;
+            return parseFloat((baseLuck + boost).toFixed(2));
+        }
+
+        function formatNum(num) { return num.toLocaleString(); }
+
+        function getRoll() {
+            const currentLuck = getTotalLuck();
+            const rand = Math.random() / currentLuck;
+            for (let aura of AURAS) {
+                if (rand <= (1 / aura.chance)) return aura;
+            }
+            return AURAS[AURAS.length - 1];
+        }
+
+        function updateCardDisplay(aura) {
+            auraTitle.innerText = aura.name;
+            auraTitle.style.color = aura.color;
+            auraChance.innerText = `1 in ${formatNum(aura.chance)}`;
+            auraChance.style.color = aura.color;
+            auraTier.innerText = aura.tier;
+            auraTier.style.color = aura.color;
+            auraTier.style.borderColor = aura.color;
+            powerBox.innerText = aura.desc;
+            powerBox.style.borderColor = aura.color;
+
+            auraCard.style.setProperty('--aura-color', aura.color);
+            auraCard.style.setProperty('--aura-glow', aura.color + "66");
+        }
+
+        function roll() {
+            if (isRolling) return;
+            isRolling = true;
+            rollBtn.disabled = true;
+
+            rolls++;
+            rollCountEl.innerText = formatNum(rolls);
+
+            const finalAura = getRoll();
+
+            if (equippedAura && equippedAura.effect) {
+                triggerEquippedEffect(equippedAura.effect, equippedAura.color);
+            }
+            
+            let totalTicks = 16;
+            let tickSpeed = 50;
+
+            if (finalAura.chance >= 1000000) {
+                totalTicks = 40;
+                tickSpeed = 30;
+                document.body.classList.add('screen-shake-extreme');
+            } else if (finalAura.chance >= 10000) {
+                totalTicks = 25;
+                document.body.classList.add('screen-shake');
+            }
+
+            let ticks = 0;
+            const timer = setInterval(() => {
+                const randomSample = AURAS[Math.floor(Math.random() * AURAS.length)];
+                updateCardDisplay(randomSample);
+                ticks++;
+
+                if (ticks >= totalTicks) {
+                    clearInterval(timer);
+                    document.body.classList.remove('screen-shake', 'screen-shake-extreme');
+
+                    if (finalAura.chance >= 1000000) {
+                        document.body.classList.add('cutscene-flash');
+                        setTimeout(() => document.body.classList.remove('cutscene-flash'), 600);
+                    }
+
+                    updateCardDisplay(finalAura);
+
+                    const coinMult = equippedAura ? equippedAura.coinMult : 1;
+                    const earned = Math.max(1, Math.floor(Math.log10(finalAura.chance) * 5 * coinMult));
+                    coins += earned;
+                    coinValEl.innerText = formatNum(coins);
+
+                    if (!inventory[finalAura.name]) {
+                        inventory[finalAura.name] = { ...finalAura, count: 0 };
+                    }
+                    inventory[finalAura.name].count++;
+
+                    if (finalAura.chance >= 100) {
+                        spawnBurst(finalAura.color, Math.min(200, Math.floor(Math.log10(finalAura.chance) * 35)));
+                    }
+
+                    isRolling = false;
+                    rollBtn.disabled = false;
+                    saveGame(); // Auto Save on Roll Finish
+                }
+            }, tickSpeed);
+        }
+
+        function triggerEquippedEffect(type, color) {
+            if (type === 'vortex') spawnVortex(color);
+            else if (type === 'rays') spawnRays(color);
+            else if (type === 'pulse') spawnPulseRing(color);
+            else if (type === 'spiral') spawnSpiral(color);
+            else if (type === 'shockwave') spawnShockwave(color);
+            else if (type === 'godly') spawnGodlyEffect(color);
+        }
+
+        function toggleAuto() {
+            autoRoll = !autoRoll;
+            if (autoRoll) {
+                autoBtn.innerText = "AUTO: ON";
+                autoBtn.classList.add('active');
+                roll();
+                autoInterval = setInterval(() => { if (!isRolling) roll(); }, 1000);
+            } else {
+                autoBtn.innerText = "AUTO: OFF";
+                autoBtn.classList.remove('active');
+                clearInterval(autoInterval);
+            }
+        }
+
+        function upgradeLuck() {
+            if (coins >= luckCost) {
+                coins -= luckCost;
+                baseLuck = parseFloat((baseLuck + 0.25).toFixed(2));
+                luckCost = Math.floor(luckCost * 1.8);
+
+                coinValEl.innerText = formatNum(coins);
+                luckValEl.innerText = getTotalLuck() + "x";
+                luckCostEl.innerText = formatNum(luckCost);
+                saveGame(); // Auto Save on Upgrade
+            }
+        }
+
+        function equipAura(auraName) {
+            const aura = inventory[auraName];
+            if (!aura) return;
+
+            equippedAura = aura;
+            
+            document.body.className = '';
+            if (aura.bg) document.body.classList.add(aura.bg);
+            
+            document.documentElement.style.setProperty('--theme-accent', aura.color);
+            luckValEl.innerText = getTotalLuck() + "x";
+            saveGame(); // Auto Save on Equip
+            openCollection();
+        }
+
+        function openCollection() {
+            invList.innerHTML = '';
+            discoveredCountEl.innerText = `${Object.keys(inventory).length}/${AURAS.length}`;
+
+            AURAS.forEach(aura => {
+                const item = inventory[aura.name];
+                if (item) {
+                    const isEquipped = equippedAura && equippedAura.name === aura.name;
+                    const div = document.createElement('div');
+                    div.className = 'inv-item';
+                    div.style.borderColor = aura.color;
+                    
+                    div.innerHTML = `
+                        <div>
+                            <div style="color:${aura.color}; font-weight:bold;">${aura.name}</div>
+                            <small style="color:var(--subtext)">1 in ${formatNum(aura.chance)} (x${item.count}) | ${aura.desc}</small>
+                        </div>
+                        <button class="inv-btn ${isEquipped ? 'upgrade-btn' : 'secondary-btn'}">
+                            ${isEquipped ? 'Equipped' : 'Equip'}
+                        </button>
+                    `;
+
+                    div.querySelector('button').addEventListener('click', () => equipAura(aura.name));
+                    invList.appendChild(div);
+                }
+            });
+            modal.style.display = 'flex';
+        }
+
+        function closeCollection() { modal.style.display = 'none'; }
+
+        /* Canvas Particle Effects */
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let specialEffects = [];
+
+        function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function spawnBurst(color, amount) {
+            for (let i = 0; i < amount; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 10 + 2;
+                particles.push({
+                    x: canvas.width / 2,
+                    y: canvas.height / 2,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    size: Math.random() * 6 + 2,
+                    color: color,
+                    life: 1,
+                    decay: Math.random() * 0.02 + 0.008
+                });
+            }
+        }
+
+        function spawnVortex(color) {
+            for (let i = 0; i < 40; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * 250 + 50;
+                specialEffects.push({
+                    type: 'vortex',
+                    x: canvas.width / 2 + Math.cos(angle) * dist,
+                    y: canvas.height / 2 + Math.sin(angle) * dist,
+                    angle: angle,
+                    dist: dist,
+                    color: color,
+                    life: 1
+                });
+            }
+        }
+
+        function spawnRays(color) {
+            for (let i = 0; i < 8; i++) {
+                specialEffects.push({
+                    type: 'ray',
+                    angle: (Math.PI * 2 / 8) * i,
+                    length: 0,
+                    color: color,
+                    life: 1
+                });
+            }
+        }
+
+        function spawnPulseRing(color) {
+            specialEffects.push({ type: 'ring', radius: 10, color: color, life: 1 });
+        }
+
+        function spawnSpiral(color) {
+            for (let i = 0; i < 30; i++) {
+                specialEffects.push({
+                    type: 'spiral',
+                    angle: (i * 0.2),
+                    radius: i * 8,
+                    color: color,
+                    life: 1
+                });
+            }
+        }
+
+        function spawnShockwave(color) {
+            specialEffects.push({ type: 'ring', radius: 5, color: color, life: 1 });
+            spawnBurst(color, 80);
+        }
+
+        function spawnGodlyEffect(color) {
+            spawnVortex('#a855f7');
+            spawnRays('#67e8f9');
+            spawnPulseRing('#ffffff');
+        }
+
+        function renderParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            specialEffects.forEach((eff, idx) => {
+                eff.life -= 0.02;
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, eff.life);
+                ctx.strokeStyle = eff.color;
+                ctx.fillStyle = eff.color;
+                ctx.shadowColor = eff.color;
+                ctx.shadowBlur = 15;
+
+                if (eff.type === 'vortex') {
+                    eff.dist -= 3;
+                    eff.angle += 0.08;
+                    eff.x = canvas.width / 2 + Math.cos(eff.angle) * eff.dist;
+                    eff.y = canvas.height / 2 + Math.sin(eff.angle) * eff.dist;
+                    ctx.beginPath();
+                    ctx.arc(eff.x, eff.y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (eff.type === 'ring') {
+                    eff.radius += 14;
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.arc(canvas.width / 2, canvas.height / 2, eff.radius, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else if (eff.type === 'ray') {
+                    eff.length += 25;
+                    ctx.lineWidth = 6;
+                    ctx.beginPath();
+                    ctx.moveTo(canvas.width / 2, canvas.height / 2);
+                    ctx.lineTo(
+                        canvas.width / 2 + Math.cos(eff.angle) * eff.length,
+                        canvas.height / 2 + Math.sin(eff.angle) * eff.length
+                    );
+                    ctx.stroke();
+                } else if (eff.type === 'spiral') {
+                    eff.radius += 4;
+                    eff.angle += 0.1;
+                    const x = canvas.width / 2 + Math.cos(eff.angle) * eff.radius;
+                    const y = canvas.height / 2 + Math.sin(eff.angle) * eff.radius;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                if (eff.life <= 0) specialEffects.splice(idx, 1);
+            });
+
+            particles.forEach((p, idx) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.95;
+                p.vy *= 0.95;
+                p.life -= p.decay;
+
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.life);
+                ctx.fillStyle = p.color;
+                ctx.shadowColor = p.color;
+                ctx.shadowBlur = 12;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                if (p.life <= 0) particles.splice(idx, 1);
+            });
+
+            requestAnimationFrame(renderParticles);
+        }
+
+        // Initialize and load saved progress on startup
+        loadGame();
+        renderParticles();
+    </script>
+</body>
+</html>
